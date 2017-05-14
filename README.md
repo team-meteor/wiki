@@ -17,16 +17,16 @@ iOS에 대한 문서를 만들고 모아봅시다.
 
 ## Self-Check-List
 ### Objective-C
-* [NSObject 메소드를 오버라이딩해서 구현해본 경험이 있다.](https://github.com/code-squad/iOS-Cheat-Sheet/blob/master/self-check-list/nsobject-overriding.md)
-* [Category와 클래스 구현 상속의 차이를 알고, Category로 확장해봤다.](https://github.com/code-squad/iOS-Cheat-Sheet/blob/master/self-check-list/category-class.md)
-* [Strong와 Weak 메모리 개념을 설명할 수 있다.](https://github.com/code-squad/iOS-Cheat-Sheet/blob/master/self-check-list/strong-weak.md)
-* [프로퍼티와 instance variable 구조, getter/setter 처리 방식을 설명할 수 있다.](https://github.com/code-squad/iOS-Cheat-Sheet/blob/master/self-check-list/instance-variable-getter-setter.md)
+* NSObject 메소드를 오버라이딩해서 구현해본 경험이 있다.
+* Category와 클래스 구현 상속의 차이를 알고, Category로 확장해봤다.
+* Strong와 Weak 메모리 개념을 설명할 수 있다.
+* 프로퍼티와 instance variable 구조, getter/setter 처리 방식을 설명할 수 있다.](
 
 ### Swift
-* [스위프트 기본 문법을 이해하고 struct나 class, enum 타입을 만들 수 있다.]()
-* [struct와 class를 구분해서 설명할 수 있고, 어떤 경우 사용할지 기준을 갖고 있다.]()
-* [protocol와 extension 개념에 대해 설명할 수 있고, 어떤 경우에 활용하는지 알고 있다.]()
-* [클로저를 만들어서 고차 함수의 매개변수나 리턴타입으로 전달할 수 있다.]()
+* [스위프트 기본 문법을 이해하고 struct나 class, enum 타입을 만들 수 있다.](https://github.com/code-squad/iOS-Cheat-Sheet/blob/master/self-check-list/struct-class-enum.md)
+* struct와 class를 구분해서 설명할 수 있고, 어떤 경우 사용할지 기준을 갖고 있다.
+* protocol와 extension 개념에 대해 설명할 수 있고, 어떤 경우에 활용하는지 알고 있다.
+* 클로저를 만들어서 고차 함수의 매개변수나 리턴타입으로 전달할 수 있다.
 
 ### 앱 아키텍처
 
