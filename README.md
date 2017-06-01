@@ -53,7 +53,7 @@ iOS에 대한 문서를 만들고 모아봅시다.
 * HTTP Request 메소드나 헤더를 변경하려면 어떻게 하는가?
 
 ### 메모리 관리
-* [ARC나 수동 메모리 관리 방법에 대해서 설명할 수 있다.](https://github.com/code-squad/iOS-Cheat-Sheet/blob/master/self-check-list/memoryManagement.md)
+* [ARC나 수동 메모리 관리 방법에 대해서 설명할 수 있다.](https://github.com/torpedo87/iOS-Cheat-Sheet/blob/master/self-check-list/memoryManagement.md)
 * viewDidLoad, viewWillAppear, viewDidDisappear 등 ViewController 메소드 호출 시점에 대해 설명할 수 있다.
 
 ### 멀티쓰레드
