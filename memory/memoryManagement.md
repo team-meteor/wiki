@@ -15,7 +15,9 @@ func foo(c: Myclass) {
 ---
 
 # 수동 메모리 관리의 필요성
+
 - object가 서로 참조하는 경우 순환참조가 생성되어 scope를 벗어나거나 값이 nil 이 되어도 reference count가 0이 되지 않는 현상이 발생한다.
+
 ---
 
 ## 순환참조 방지하기
@@ -25,6 +27,7 @@ func foo(c: Myclass) {
 
 ### unowned 참조방식
 - weak 참조방식과 같이 reference counting이 증가하지 않는다. 차이점은 weak 참조는 referece counting이 0 이 될 때 nil 값으로 변경되므로 optional이지만, unowned 참조방식은 값이 변경되지 않으므로 메모리에서 해제되었을 시 존재하지 않는 메모리를 참조하는 경우가 발생할 수 있어 주의해야 한다.
+
 ---
 
 ## closure
