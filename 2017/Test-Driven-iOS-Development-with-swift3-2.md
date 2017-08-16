@@ -25,4 +25,4 @@ TDD에서, 테스트를 작성하는 동안에는 실제 코드에 대해서는 
 
 The task list view 
 
-![task list view](images/1708163308.png)
+![task list view](../images/1708163308.png)
