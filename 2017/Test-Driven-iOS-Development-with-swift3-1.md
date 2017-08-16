@@ -17,14 +17,14 @@
 
 ### Important built-in assert functions
 
-`XCTAssertTrue(_:_:file:line:):`
-`XCTAssertFalse(_:_:file:line:):`
-`XCTAssertEqual(_:_:_:file:line:):`
-`XCTAssertEqualWithAccuracy(_:_:accuracy:_:file:line:):`
-`XCTAssertNotEqual(_:_:_:file:line:):`
-`XCTAssertNil(_:_:file:line:):`
-`XCTAssertNotNil(_:_:file:line:):`
-`XCTFail(_:file:line:):`
+`XCTAssertTrue(_:_:file:line:):`  
+`XCTAssertFalse(_:_:file:line:):`  
+`XCTAssertEqual(_:_:_:file:line:):`  
+`XCTAssertEqualWithAccuracy(_:_:accuracy:_:file:line:):`  
+`XCTAssertNotEqual(_:_:_:file:line:):`  
+`XCTAssertNil(_:_:file:line:):`  
+`XCTAssertNotNil(_:_:file:line:):`  
+`XCTFail(_:file:line:):`  
 
 ```swift
 // XCTAssert의 파라메터를 이용해 로그 조작할 수 있다.
@@ -33,31 +33,34 @@ XCTAssertEqual(numberOfVowels,
   "should find 4 vowels in Dominik", 
   file: "FirstDemoTests.swift", 
   line: 24
-  )
+)
 ```
 
 ```
-FirstDemoTests.swift:24: error: -[FirstDemoTests.FirstDemoTests test_NumberOfVowels_WhenPassedDominik_ReturnsThree] : XCTAssertEqual failed: ("Optional(3)") is not equal to ("Optional(4)") - should find 4 vowels in Dominik
+FirstDemoTests.swift:24: error: -[FirstDemoTests.FirstDemoTests test_NumberOfVowels_WhenPassedDominik_ReturnsThree] 
+: XCTAssertEqual failed: ("Optional(3)") is not equal to ("Optional(4)") - should find 4 vowels in Dominik
 ```
 
 ### Understanding TDD
 
 Robert C. Martin이 TDD에 관한 세 가지 간단한 규칙을 제안했다.
 
+원문
+
 - You are not allowed to write any production code unless it is to pass a failing unit test
 - You are not allowed to write any more of a unit test than is sufficient to fail, and compilation failures are failures
 - You are not allowed to write any more production code than is sufficient to pass the one failing unit test
+
+번역 ~~뭔말인지 모르겠다~~
 
 - 실패하는 테스트를 통과하지 못한다면 제품 코드를 작성할 수 없다.
 - 실패하기 충분한 더 이상의 유닛테스트를 작성할 수 없다. 그리고 컴파일 실패는 실패다.
 - 하나의 실패하는 유닛테스트를 통과하기 충분한 더 이상의 제품 코드를 작성할 수 없다.
 
-~~뭔말인지 모르겠다~~
-
-> 1. 실패하는 테스트를 작성하기 전에는 절대로 제품 코드를 작성하지 않는다,
-> 2. 실패하는 테스트 코드를 한 번에 하나 이상 작성하지 않는다.
-> 3. 현재 실패하고 있는 테스트를 통과하기에 충분한 정도를 넘어서는 제품 코드를 작성하지 않는다.  
-> 테스트 주도 개발 by 채수원
+퍼오기 (테스트 주도 개발 by 채수원)
+> 실패하는 테스트를 작성하기 전에는 절대로 제품 코드를 작성하지 않는다,
+> 실패하는 테스트 코드를 한 번에 하나 이상 작성하지 않는다.
+> 현재 실패하고 있는 테스트를 통과하기에 충분한 정도를 넘어서는 제품 코드를 작성하지 않는다.  
 
 아직 선언되지 않은 새로운 클래스나 메소드를 사용하는 기능을 시작할 때, 테스트는 즉시 실패할 것이고, 테스트를 마치기 위한 약간의 코드를 추가해야 되기 때문에 이 규칙은 바보 같은 소리로 들릴 것이다. 하지만 이 규칙을 따르면, 기능을 구현하기 위한 실제로 필요한 코드만을 작성하게 된다. 모든 작성된 코드는 결국 최종 제품의 일부가 되거나 테스트 suite의 일부가 될 것이다.
 
