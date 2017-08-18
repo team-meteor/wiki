@@ -140,3 +140,64 @@ var name: String {
 - serial queue 는 1개의 thread를 사용하므로 동시에 여러개의 task를 처리할 수 없다
 - concurrent queue 는 thread 를 여러개 만들 수 있으므로 동시에 여러 업무 처리가 가능하다
 ---
+
+## sync tasks 를 async로 처리하고 싶을 때
+
+### 1. async로 감싸기
+```swift
+DispatchQueue.global().async {
+    let result = syncFunc()
+    result
+}
+```
+
+### 2. sync task 를 async 로 변형
+```swift
+//completionQueue 는 주로 main queue
+public func asyncSyncFunction(_ input: inputType, runQueue: DispatchQueue, 
+    completionQueue: DispatchQueue, completion: @escaping(resultType, error) -> ()) {
+        runQueue.async {
+            var error: Error?
+            error = .none
+            let result = syncFunction(input)
+            completionQueue.async {
+                completion(result, error)
+            }
+        }
+    }
+```
+
+### 3. 클로저 안의 tasks 가 동기적이면(체이닝) 순서대로 실행
+```swift
+DispatchQueue.global().aync {
+    let out0 = task0()
+    let out1 = task1(inString: out0)
+    let out2 = task2(inString: out1)
+    print(out2)
+}
+```
+
+### 4. serial queue에 각각 task를 분리시켜도 동기적으로 순서대로 실행
+```swift
+DispatchQueue(label: "com").async {
+    let out0 = task0()
+}
+DispatchQueue(label: "com").async {
+    let out1 = task1(inString: out1)
+}
+DispatchQueue(label: "com").async {
+    let out2 = task2(inString: out2)
+}
+```
+
+### 5. 비슷한 독립적인 non-UI task 들을 실행할 때 concurrent queue 사용
+- loop를 돌면서 여러개의 thread를 사용해 동시에 여러 task를 실행하지만 순서대로 실행
+
+```swift
+let values = [Int](1...12)
+for value in values {
+    DispatchQueue.global().async {
+        randomTask(value)
+    }
+}
+```
