@@ -62,3 +62,81 @@ queue.async {
 
 ### 3. deadlock
 - serial queue를 이용해 thread간 접근을 제한하여 동시 접근 문제를 해결할 수 있지만, 둘 다 제한되어 잠들어 버리는 경우
+
+---
+
+## GCD (업무분담)
+- GCD는 개발자 대신 thread를 통제한다
+- main thread + serial queue  or  main thread + concurrent queue
+- serial queue 는 thraed 1개 사용, concurrent queue 는 여러개의 thread 생성가능
+- serial queue를 사용하면 thread간 충돌이 없기 때문에 concurrency의 여러 문제점 해결 가능
+
+## concurrent queue와 async 는 같은 것이 아니다
+- serial queue or concurrent queue 에서 모두 비동기 업무 처리가 가능하다
+- 동기와 비동기의 차이는 queue 상에서 task가 완료될 때 까지 기다리느냐의 차이이다
+- serial 과 concurrent의 차이는 thread 갯수 차이이다 (동시에 몇개의 업무가 처리 가능한지의 차이)
+
+## GCD의 queue 종류 (First In First Out, task가 도착하는 순서로 시작한다)
+
+### 1. main
+- serial
+- 1 thread
+- 동기적 업무 처리시 다른 업무 처리불가
+
+### 2. global
+- concurrent
+- 동기적으로 업무를 처리해도 다른 thread에서 task 처리 가능하다
+- 시작순서와 완료순서가 다를 수 있다
+- task 특성에 따라 qos를 지정할 수 있다
+
+### 3. private
+- serial queue(default) = DispatchQueue(label: "")
+- concurrent queue = DispatchQueue(label: "", attributes: .concurrent)
+
+## quality of service(qos) 에 따른 queue의 priority
+- userInteractive = UI 관련, 높은 우선순위
+- userInitiated = 비동기적 UI 업무 (저장된 문서 열기)
+- default
+- utility = progress indicator 와 함께 오래 걸리는 업무 (네트워킹)
+- background = non UI task
+- unspecified
+
+## async
+- UI 관련 task는 main queue이고 나머지는 global queue에 분배
+- 즉시 return 하므로 task가 언제 완료되는지 모른다
+
+```swift
+DispatchQueue.global().async {
+    //do expensive synchronous task
+    DispathchQueue.main.async {
+        //UI task
+    }
+}
+```
+
+## sync
+- 주로 getter, setter 에 사용 (잠시 current queue 를 block 하므로 주의해야 한다)
+- task가 끝날때까지 current thread를 block 한다. 끝날때 까지 current thread에 다른 업무를 분배할 수 없다
+- current queue에서 sync 업무를 분배하면 deadlock에 걸릴 수 있다
+- main queue에서 절대 sync 업무 분배하지 않는다 (main thread를 block하기 때문)
+- sync 업무는 어느 queue에 분배하든지 실제로는 current queue에서 동작한다
+- main queue는 항상 main thread를 사용한다
+
+```swift
+private let internalQueue = DispatchQueue(label: "com.raywenderlich")
+
+var name: String {
+    get {
+        return internalQueue.sync{ internalName }
+    }
+    set (newName) {
+        internalQueue.sync { internalName = newName }
+    }
+}
+```
+## sync vs async, serial vs concurrent 의 차이를 이해하자
+- sync는 task가 끝날때까지 current thread를 봉쇄하므로 main queue에서 사용해서는 안된다
+- async는 task가 끝나기 전에 다른 task를 시작할 수 있다
+- serial queue 는 1개의 thread를 사용하므로 동시에 여러개의 task를 처리할 수 없다
+- concurrent queue 는 thread 를 여러개 만들 수 있으므로 동시에 여러 업무 처리가 가능하다
+---
