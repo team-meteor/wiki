@@ -3,7 +3,7 @@
 
 ## FAQ
 ### 1. what is concurrency?
-- 동시에 복수의 업무가 수행된다.
+- 동시에 복수의 업무를 수행하는 것
 - GCD, operations 를 사용해 처리 가능
 - 1개의 CPU로는 처리가 힘들다
 - 매번 실행되는 순서가 다르다
@@ -18,6 +18,7 @@
 - 같은 resource에 접근하는 task라면 thread safe 해야 한다.
 
 ### 4. which to use? GCD(Grand Central Dispatch) or operations?
+- iOS 운영체제에서 멀티태스킹할 때 사용하는 API로서 간접적으로 thread를 통제하는 툴입니다.
 - GCD는 보다 간단한 작업에 적합, operation은 복잡한 작업에 적합
 
 ### 5. where do tasks run?
@@ -201,3 +202,45 @@ for value in values {
     }
 }
 ```
+---
+
+## 하나의 task 완료시점을 알고 싶을 때
+- closure 를 사용한다
+
+## 연관된 collection of tasks 의 완료시점을 알고 싶을 때
+- async 매개변수에 group을 넣기
+```swift
+//create group
+let group = DispatchGroup()
+
+//dispatching to a group
+workerQueue.async(group: group) {
+    print("task1")
+}
+
+//tasks group 이 완료되는 시점 알림
+group.notify(queue: DispathQueue.main) {
+    print("both tasks have completed")
+}
+
+//tasks group 이 완료될때까지 current queue 를 block하고 싶을 때 사용, main queue에서는 호출하지 말 것
+group.wait(timeout: DispatchTime.distantFutere)
+```
+
+- task 자체가 async 일때
+```swift
+let wrappedGroup = DispatchGroup()
+
+func asyncWithGroup(_ input: InputType, completionQueue: DispatchQueue, group: DispatchGroup, completion: @escaping(OutputType, Error?)->()) {
+
+    group.enter()
+
+    asyncFunction(input, completionQueue: completionQueue) { result, error in
+        completion(result, error)
+        group.leave()
+    }
+}
+```
+---
+
+## operation

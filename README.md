@@ -12,3 +12,4 @@
 - iOS Unit Testing and UI Testing Tutorial 번역 [read](2017/iOS-Unit-Testing-and-UI-Testing-Tutorial.md)
 - Test-Driven iOS Development with Swift 3 번역 [chapter 1](2017/Test-Driven-iOS-Development-with-swift3-1.md)
 - iOS Concurrency with GCD and Operations 번역 [read](2017/iOS-Concurrency-with-GCD-and-Operations.md)
+- GrandCentralDispatch tutorial for swift3 chapter1 번역 [chapter 1](2017/GrandCentralDispatch-tutorial-for-swift3-part1.md)
