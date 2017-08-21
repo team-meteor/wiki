@@ -203,6 +203,43 @@ downloadGroup.notify(queue: DispatchQueue.main) {
 - 랜덤숫자가 1이면 task 를 취소한다. 큐에 여전히 존재하는, 아직 실행되지 않은 task만 취소가 가능하다. 실행중인 task는 취소가 불가능하다
 - dispatch group에서 취소된 task를 뺀다.
 - 앱을 실행해서 이미지를 다운로드 해보자. 3개 이상의 이미지를 다운로드하는 것을 볼 수 있다. 초과된 이미지 갯수는 앱을 실행할때마다 다르다. 추가적인 이미지 다운로드 task중 일부가 다운로드를 시작하기 전에 취소가 된다.
+---
 
 ## Miscellaneous GCD Fun
+- 아직 잡다한 메소드들이 더 남았다. 자주 사용하지는 않을지라도, 엄청 도움이 될 것이다.
+
+### Testing Asynchronous code
+- 이상하게 들릴 것이다. Xcode에 test기능이 있다는 것을 알고 있었니? 테스트 코드는 복잡한 구조의 코드를 짤 때 매우 중요하다.
+- 테스트는 XCTestCase의 하위클래스에서 수행된다. test로 시작하는 이름의 메소드를 모두 실행한다. 테스트는 main thread에서 동작한다. 따라서 테스트는 serial하게 순서대로 동작한다.
+- 주어진 테스트 메소드가 완료되자마자 XCTest는 다음 테스트를 실행시킨다. 이전 test에서 비동기적으로 동작하는 작업들의 완료와는 관계없이 다음 테스트 메소드가 실행한다.
+- 네트워크 통신 업무는 main thread 를 차단하는 것을 원치 않기 때문에 주로 비동기처리 업무이다. 이러한 비동기 메소드들은 테스트하기가 까다롭다.
+
+## 비동기 작업을 테스트하기
+
+### 1. Semaphores (신호기)
+- 이것은 오래된 신호 방법이다. 운영체제의 복잡성 상에서 동작하기 때문에 까다로운 주제이다. 만약 이걸 공부하고 싶으면 semaphore 이론을 찾아보길 바란다.
+- GooglyPuffTests.swift 파일을 열고 downloadImageURLWithString(_:)을 다음과 같이 수정해보자
+```swift
+let url = URL(string: urlString)
+let semaphore = DispatchSemaphore(value: 0) // 1
+let _ = DownloadPhoto(url: url!) {
+  _, error in
+  if let error = error {
+    XCTFail("\(urlString) failed. \(error.localizedDescription)")
+  }   
+  semaphore.signal() // 2
+}
+let timeout = DispatchTime.now() + .seconds(defaultTimeoutLengthInSeconds)
+if semaphore.wait(timeout: timeout) == .timedOut { // 3
+  XCTFail("\(urlString) timed out")
+} 
+```
+- semaphore 신호기를 생성하고 초기값을 0으로 설정한다. 이 신호값은 신호를 보내지 않고도 신호에 접근 가능한 갯수를 나타낸다
+- 이미지 다운로드가 완료되면 completion closure에서 신호를 보낸다. 그러면 신호 숫자가 증가하고, 따라서 신호값이 증가한다.
+- 주어진 timeout 동안 신호를 기다린다. 이것은 신호값 증가가 완료될때 까지 current thread를 차단하는 것이다. 리턴값이 0 이 아니라면(fail이면) 타임아웃이 끝난 것이다. 위의 경우에서는 네트워크 통신이 10초 이상 걸리면 실패로 간주된다.
+- cmd + U 를 눌러 테스트를 실행해보면 성공할 것이다. 
+- 네트워크를 비활성화되도록 설정한 후 다시 테스트해보자. 디바이스에서 실행한다면 비행기모드를 켜고 시뮬레이터로 실행한다면 통신을 끄고 테스트해보자. 10초 후에 실패라고 뜰 것이다.
+- 위의 테스트가 하찮은 작업일지도 모르지만 만약 서버팀과 함께 일하는 경우 이러한 기초 테스트를 통해 비난을 면할 수 있다.
+
+### 2. Expectations
 - 
