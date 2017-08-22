@@ -24,7 +24,6 @@
 ### 5. where do tasks run?
 - thread 에서 실행된다
 - UI task 는 main thread 에서 동작
-- thread 를 만들 수 있다
 - non-UI task는 main 이외의 thread에서 동작하게 해서 효율적으로 분배하는 것이 좋다
 - iOS에서 추구하는 것은 시스템으로 하여금 thread 를 통제하는 것
 
@@ -67,10 +66,12 @@ queue.async {
 ---
 
 ## GCD (업무분담)
-- GCD는 개발자 대신 thread를 통제한다
-- main thread + serial queue  or  main thread + concurrent queue
-- serial queue 는 thraed 1개 사용, concurrent queue 는 여러개의 thread 생성가능
+- serial queue(private): 각각의 큐에서는 동시에 하나의 task만 실행. 여러개의 serial queue를 만들면 각 큐에서는 동시에 각각 1개의 task만 실행하지만 전체적으로는 동시에 여러 task를 실행한다.
 - serial queue를 사용하면 thread간 충돌이 없기 때문에 concurrency의 여러 문제점 해결 가능
+
+## queue에 task를 추가하는 방식 2가지
+- 동기 = 큐에 task를 추가하기 위해 기다린다
+- 비동기 = 큐에 task를 추가하기 위해 예약해놓고 다른 일하러 간다
 
 ## concurrent queue와 async 는 같은 것이 아니다
 - serial queue or concurrent queue 에서 모두 비동기 업무 처리가 가능하다
@@ -244,3 +245,127 @@ func asyncWithGroup(_ input: InputType, completionQueue: DispatchQueue, group: D
 ---
 
 ## operation
+- 추상클래스이기 때문에 BlockOperation으로 구체화하거나 임의로 subclass를 만들어서 사용한다
+- 복잡한 이미지 필터링을 수행하는 작업을 operation queue에 넣을 것이다
+- selective focus 효과를 감소시키는 필터링 효과(사진이 미니어쳐 처럼 보인다)
+- default값은 sync하게 동작
+
+### operation queue에 넣을 operation 생성하기
+- 간단한 operation은 Dispatch queue에서 실행되는 클로저 형태와 같다
+```swift
+let operation = BlockOperation {
+    print("operation started")
+    print("operation finished")
+}
+```
+- 재사용하고 싶으면 Operation을 상속한다
+```swift
+class ImageTransformOperation: Operation {
+    var inputImage: UIImage?
+    var outputImage: UIImage?
+
+    override func main() {
+        outputImage = transform(image: inputImage)
+    }
+}
+```
+- 상속받은 operation은 input, ouput 프로퍼티를 가질 수 있고 helper method를 가질 수 있다. task를 실행하기 위한 main 메소드를 재정의 해야한다
+- Operation class는 task 단위를 나중에 실행하기 위해 포장해놓는 것과 같다. 다른 작업들을 하다가 원하는 시점에 이 task를 실행할 수 있다.
+- Operation은 life cycle 을 지닌다
+- 초기화 -> isReady -> isExecuting (-> isCancelled) -> isFinished
+```swift
+open class Operation: NSObject {
+    open func start()
+    open func main()
+    open var isCancelled: Bool { get }
+    open func cancel()
+
+    open var isExecuting: Bool { get }
+    open var isFinished: Bool { get }
+    open var isAsynchronous: Bool { get }
+    open var isReady: Bool { get }
+
+    open var completionBlock: ( ()->Swift.Void )?
+    open var qualityOfService: QualityOfService
+    open var name: String?
+}
+```
+- task를 main thread 이외의 곳에서 동작하게 하려면 dispatch queue or operation queue로 분담해야 한다
+- Operation 을 상속하면 operation task의 현재상태를 파악하기 쉽다
+- task 가 완료되면 completionblock이 호출된다
+
+### BlockOperation
+- Operation은 추상클래스이므로 단독으로 생성될 수 없으며, Operation 인스턴스를 생성하기 위한 가장 간단한 방법으로 BlockOperation class를 사용한다
+```swift
+open class BlockOperation: Operation {
+    public convenience init(block: @escapint () -> Swift.Void)
+    open func addExecutionBlock(_ block: @escapiing() -> Swift.Void)
+    open var executionBlocks: [() -> Swift.Void] { get }
+}
+```
+- BlockOperation class 는 global queue 에서 복수의 block task 가 concurrent하게 실행되는 것을 관리한다
+- Dispatch queue를 사용하지 않으며 Operation dependency, KVO notification, cancelling 등의 장점을 제공한다.
+- Dispatch group 과 같이 모든 block task가 완료되는 시점을 알 수 있다
+- block tsak가 serial 하게 동작하기를 원한다면 private dispatch queue에 넣거나, operation dependency 를 사용할 수 있다
+```swift
+var result: Int?
+
+let blockOperation = BlockOperation()
+
+blockOperation.completionBlock {
+    print("all finished")
+}
+
+blockOperation.addExecutionBlock {
+    print("hello")
+    sleep(2)
+}
+blockOperation.addExecutionBlock {
+    print("my")
+    sleep(2)
+}
+blockOperation.addExecutionBlock {
+    print("name")
+    sleep(2)
+}
+blockOperation.addExecutionBlock {
+    print("is")
+    sleep(2)
+}
+blockOperation.addExecutionBlock {
+    print("samchon")
+    sleep(2)
+}
+
+blockOperation.start()
+
+```
+- BlockOperation은 global queue에서 concurrent 하게 동작하므로 위의 코드의 출력 순서가 랜덤이다
+- completionBlock을 사용하면 Dispatch group과 같이 blockOperation에 포함된 복수의 task가 모두 완료되는 시점을 알 수 있다
+- 위와 같이 간단한 task는 BlockOperation으로 가능하지만 input ouput 등이 필요한 복잡한 작업은 임의로 subclass를 만들어야 한다
+
+### Subclassing Operation
+- Operation을 보다 정교하게 관리할 수 있다
+```swift
+
+let inputImage = UIImage(named: "samchon")
+
+class SubclassOperation: Operation {
+    var inputImage: UIImage?
+    var outputImage: UIImage?
+
+    override func main() {
+        outputImage = filterImage(image: inputImage)
+    }
+}
+
+let filterImageOperation = subclassOperation()
+filterImageOperation.inputImage = inputImage
+
+filterImageOperation.start()
+
+```
+- filter작업이 느리기 때문에 수정이 필요하다
+
+### OperationQueue
+- 
