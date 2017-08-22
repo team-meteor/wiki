@@ -242,4 +242,105 @@ if semaphore.wait(timeout: timeout) == .timedOut { // 3
 - 위의 테스트가 하찮은 작업일지도 모르지만 만약 서버팀과 함께 일하는 경우 이러한 기초 테스트를 통해 비난을 면할 수 있다.
 
 ### 2. Expectations
-- 
+- XCTest framework는 비동기 작업 테스트를 위한 또다른 방법으로 expectations을 제공한다. 자신이 기대하는 expectation을 미리 설정하고 비동기 작업을 실행하면 비동기 작업의 결과가 앞에서 설정한 expectation을 충족할 때까지 test runner 는 기다린다. GooglyPuffTests.swift에서 downloadImageURLWithString(_:)을 다음과 같이 수정하자.
+```swift
+let url = URL(string: urlString)
+let downloadExpectation = 
+  expectation(description: "Image downloaded from \(urlString)") // 1
+let _ = DownloadPhoto(url: url!) {
+  _, error in
+  if let error = error {
+    XCTFail("\(urlString) failed. \(error.localizedDescription)")
+  }   
+  downloadExpectation.fulfill() // 2
+}   
+waitForExpectations(timeout: 10) { // 3
+  error in
+  if let error = error {
+    XCTFail(error.localizedDescription)
+  }   
+} 
+
+```
+- expectation(description:)을 설정한다. 기대하는 내용을 description에 넣는다
+- 비동기 작업의 completion closure 내부에서 성공시 expectation.fulfill()
+- expectation.fulfill()이 호출될때까지 test runner가 기다리도록 wailForExpectation(timeout:handler:)를 호출. timeout 이 되면 에러로 간주된다.
+- test를 실행해보자. 콘솔창에 이런 식으로 출력될 것이다
+```
+Test Suite 'All tests' passed at 2017-08-22 14:43:54.052.
+Executed 3 tests, with 0 failures (0 unexpected) in 11.004 (11.007) seconds
+```
+- 이제 통신 상태를 비활성화 한 후 다시 테스트 해보자. 에러 메시지가 출력될 것이다.
+```
+[GooglyPuffTests.GooglyPuffTests testLotsOfFacesImageURL] : failed - http://i.imgur.com/tPzTg7A.jpg failed. The Internet connection appears to be offline.
+Test Suite 'All tests' failed at 2017-08-22 14:47:44.369.
+	 Executed 3 tests, with 3 failures (0 unexpected) in 0.051 (0.054) seconds
+```
+- semaphore 신호를 사용하는 방법과 비교해서 결과가 크게 다르지 않지만, expectation 방법이 XCTest framework를 활용하는 데에 좀 더 깔끔하고 읽기에도 쉽다.
+
+## Dispatch Sources
+- Dispatch source는 GCD의 흥미로운 특징이다. 특정 이벤트 타입(Unix signal, file descriptor, Mach ports, VFS Node 등)을 모니터링 하는데 사용할 수 있다.
+- Dispatch source 설정 시 모니터링 할 이벤트 타입과 이벤트 핸들러가 실행될 큐를 지정한다.
+- 처음 상태는 suspend 이다. 이 상태에서는 event handler 설정을 할 수 있다. 설정이 끝나고 resume()을 통해 실행상태가 된다
+- 이번 튜토리얼에서는 디버깅 모드에서 모니터링하는 방법에 대해 맛보기만 진행할 것이다. PhotoCollectionViewController.swift 를 열고 backgroundImageOpacity 전역 프로퍼티 아래에 다음을 추가하자
+```swift
+#if DEBUG // 1
+  var signal: DispatchSourceSignal? // 2
+  private let setupSignalHandlerFor = { (_ object: AnyObject) -> Void in // 3
+    let queue = DispatchQueue.main
+    signal =
+      DispatchSource.makeSignalSource(signal: Int32(SIGSTOP), queue: queue) // 4
+    signal?.setEventHandler { // 5
+      print("Hi, I am: \(object.description!)")
+    }
+    signal?.resume() // 6
+  }
+#endif
+```
+- 위의 코드는 디버깅 모드일때만 컴파일 되도록 DEBUB 지정. Project Settings -> Build Settings -> Swift Compiler - Custom Flags -> Other Swift Flags -> Debug
+- signal 변수를 선언
+- dispatch source를 처음 한번만 생성하는 setupSignalHandlerFor를 생성
+- 여기서 signal 을 구체적으로 설정하고 SIGSTOP이라는 Unix signal 타입을 모니터링 하겠다고 지정한다. 이벤트 핸들러가 실행될 큐를 메인큐로 지정한다
+- dispatch source가 성공적으로 생성되면 신호를 수신할 때마다 event handler가 발생하고 description을 콘솔에 출력한다
+- 모든 source는 디폴트 값이 suspend 이며 resuem()을 통해 시작 상태가 된다
+- viewDidLoad()의 super.viewDidLoad() 바로 아래에 다음 코드를 추가하자
+```swift
+#if DEBUG
+  _ = setupSignalHandlerFor(self)
+#endif
+```
+- 위의 코드를 통해 dispatch source 생성을 호출한다. 앱을 실행해보자. 프로그램 실행을 중지했다가 곧바로 다시 실행해보자. 콘솔에 다음과 같은 메시지가 출력될 것이다
+```
+Hi, I am: <GooglyPuff.PhotoCollectionViewController: 0x7f9c84d12b00>
+```
+- 이제 이 앱은 디버깅을 인지할 수 있게 되었다. 근데 이것이 어디에 유용하지?
+- 디버깅할 때 데이터를 출력할 수 있고 앱이 공격받을 때 보호할 수 있는 security logic을 얻을 수 있다.
+- 디버거에서 조작하기를 원하는 object를 찾는 툴로 사용할 수도 있다.
+- 뜻밖에 디버거를 중지했을 때 원하는 스택 구조에 있을 수 없다. 그러나 위의 방법을 사용하면 언제든지 디버깅을 중지할 수 있고 원하는 위치에서 코드를 실행할 수 있다. 디버거로 접근하기 애매한 곳에서 코드를 실행시킬 수 있다
+- setupSignalHandlerFor 내부의 print()에 breakpoint를 걸자
+- 앱을 중지하고 재시작할 때마다 breakpoint에 접근할 수 있다. 이제 PhotoCollectionViewController 인스턴스의 깊숙한 곳까지 접근할 수 있다.
+- 디버깅 모드의 thread는 앱이 breakpoint 걸렸을 때, 하드웨어가 어떤 작업을 하고 있는지에 따라 다르다.
+
+- breakpoint 상태에서 콘솔의 lldb에 다음과 같이 입력해보자
+```
+expr object.navigationItem.prompt
+```
+- 다음과 같이 출력될 것이다
+```
+(String?) $R4 = "WOOT!"
+```
+- 만약 다음과 같이 에러 메시지가 뜬다면
+```
+error: use of unresolved identifier 'self'
+```
+- 다음과 같이 입력해보자
+```
+(lldb) po object
+```
+- 그 다음 원하는 타입으로 타입캐스팅을 하자
+```
+(lldb) expr let $vc = unsafeBitCast(0x7fbf0af08a10, to: GooglyPuff.PhotoCollectionViewController.self)
+(lldb) expr $vc.navigationItem.prompt = "WOOT!"
+```
+- 앱 재실행시 앱 상단에 WOOT! 라고 뜰 것이다
+- 이와 같은 방식으로 앱 재실행하지 않더라도 디버깅 상태에서 UI를 업데이트 할 수도 있고 특정 메소드를 실행할 수도 있다.
