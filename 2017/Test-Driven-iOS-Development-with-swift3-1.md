@@ -8,8 +8,6 @@
 *Chapter 6*, Putting It All Together, 이전에 개발된 다른 부분들을 합쳐보고, 기능 테스트의 사용을 보여줄 것이다.  
 *Chapter 7*, Code Coverage and Continuous Integration, 어떻게 코드 커버리지를 측정하는지와 지속적인 통합에 대해 보여줄 것이다.
 
----
-
 > 첫번째 유닛 테스트 만들기  
 > TDD 이해하기  
 > Xcode에서의 TDD  
