@@ -13,4 +13,5 @@
 - iOS Concurrency with GCD and Operations 번역 [read](2017/iOS-Concurrency-with-GCD-and-Operations.md)
 - GrandCentralDispatch tutorial for swift3 번역 [1](2017/GrandCentralDispatch-tutorial-for-swift3-part1.md), [2](2017/GrandCentralDispatch-tutorial-for-swift3-part2.md)
 - Understand the View Controller Lifecycle 일부 번역 [read](2017/understand-the-view-controller-lifecycle.md)
-- Understanding Auto Layout [read](2017/Understanding-Auto-Layout.md)
+- Auto Layout Guide
+  - Understanding Auto Layout [read](2017/Understanding-Auto-Layout.md)
