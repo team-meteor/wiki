@@ -1,6 +1,6 @@
 ## 문서 저장소
 
-> 주제 : swift, iOS, computer 에 대한 한글 문서 생산 및 보관  
+> 주제 : swift, iOS에 관한 '타인'이 생산한 문서를 재가공하여 저장한다.
 > 참여 방법 : 문서 생산 후 목록 업데이트  
 > 규칙 : 파일명은 `file-name` 이런 형태로 작성.
 
@@ -15,3 +15,4 @@
 - Understand the View Controller Lifecycle 일부 번역 [read](2017/understand-the-view-controller-lifecycle.md)
 - Auto Layout Guide
   - Understanding Auto Layout [read](2017/Understanding-Auto-Layout.md)
+  - Auto Layout Without Constraints [read](2017/Auto-Layout-Without-Constraints.md)
