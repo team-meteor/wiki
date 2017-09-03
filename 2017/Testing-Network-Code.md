@@ -178,3 +178,46 @@ protocol SessionProtocol {
 ```swift
 extension URLSession: SessionProtocol {}
 ```
+
+다음, 모의 클래스가 해당 프로토콜을 준수한다는 것을 컴파일러에게 알려야 한다. 다음처럼 바꾸자.
+
+```swift
+class MockURLSession: SessionProtocol {
+  // ...
+}
+```
+
+마지막으로, `session` 프로퍼티의 타입을 바꾸자. `APIClient`에서 `URLSession` 타입을 `SessionProtocol`으로 바꾸자.
+
+```swift
+lazy var session: SessionProtocol = URLSession.shared
+```
+
+테스트를 수행하자. 이제 테스트는 컴파일되고, 다음으로 가자. `APIClient`는 로그인 메서드가 필요하다. 다음을 `test_Login_UsesExpectedURL()`에 추가하자.
+
+```swift
+let completion = { (token: Token?, error: Error?) in }
+    sut.loginUser(withName: "dasdom",
+                  password: "1234",
+                  completion: completion)
+```
+
+`loginUser(withName:password:completion:)`과 `Token`이 없기 때문에 컴파일은 불가능하다. `APIClient`를 열어서 다음을 추가하자.
+
+```swift
+func loginUser(withName username: String,
+                 password: String,
+                 completion: @escaping (Token?, Error?) -> Void) {   
+}
+```
+
+`Token.swift` 파일을 만들고 다음을 추가하자.
+
+```swift
+struct Token { }
+```
+
+다시 컴파일하면 성공할 것이다.
+
+로그인 메서드가 예상하는 host를 사용하는지 확인하는 테스트를 만들자. `test_Login_UsesExpectedURL()` 마지막에 다음을 추가하자.
+
