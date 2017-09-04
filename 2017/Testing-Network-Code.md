@@ -221,3 +221,364 @@ struct Token { }
 
 로그인 메서드가 예상하는 host를 사용하는지 확인하는 테스트를 만들자. `test_Login_UsesExpectedURL()` 마지막에 다음을 추가하자.
 
+```swift
+guard let url = mockURLSession.url else { XCTFail(); return }
+let urlComponents = URLComponents(url: url,
+                                  resolvingAgainstBaseURL: true)
+XCTAssertEqual(urlComponents?.host, "awesometodos.com")
+```
+
+이 코드는 `mockURLSession`으로부터 URL component를 가져오고(우리의 모의 session은 URL을 캐치한다), URL의 host가 awesometodos.com 인지 검증한다. 
+
+테스트를 수행하면 테스트는 실패한다. 다음을 추가하자.
+
+```swift
+loginUser(withName:password:completion:):
+
+  guard let url = URL(string: "https://awesometodos.com") else { 
+    fatalError() 
+  }
+  session.dataTask(with: url) { (data, response, error) in 
+  }
+```
+
+테스트를 다시 수행하자. 모든 테스틑 성공하고, 리팩토링할 것도 없다. 다음, URL의 path에 대한 테스트를 추가하자. 다음 코드를 `test_Login_UsesExpectedURL()` 마지막에 추가하자.
+
+```swift
+XCTAssertEqual(urlComponents?.path, "/login")
+```
+
+테스트를 다시 통과하기 위해 다음으로 변경하자.
+
+```swift
+guard let url = URL(string: "https://awesometodos.com/login") else { 
+  fatalError() 
+}
+```
+
+모든 테스트는 성공한다. 다음, URL query 인자를 검증하자. `test_Login_UsesExpectedURL()` 마지막에 다음을 추가하자.
+
+```swift
+XCTAssertEqual(urlComponents?.query, 
+  "username=dasdom&password=1234")
+```
+
+테스트는 실패한다. 다음으로 변경하자.
+
+```swift
+let query = "username=\(username)&password=\(password)" 
+guard let url = URL(string: "https://awesometodos.com/login?\(query)") else {
+  fatalError()
+}
+```
+
+테스트는 다시 성공한다. 하지만 이전에 웹서비스 작업을 해봤다면, 코드에 문제가 있다는 것을 깨달았을 것이다. URL에서 몇몇 문자는 특별한 의미를 갖는다. 예를 들어, `&`은 URL 쿼리를 나눈다. 하지만 사용자는 이 문자를 비밀번호에 사용할 수 있다. 쿼리 아이템을 엔코딩 해야 한다. 실제 코드를 변경하도록 테스트를 리팩토링하자. 먼저, 사용자이름과 비밀번호에서 특수문자를 사용할 수 있도록 `loginUser(withName:password:completion:)` 요청을 바꾸자.
+
+```swift
+sut.loginUser(withName:"dasdöm", 
+              password: "%&34", 
+              completion: completion)
+```
+
+다음, 쿼리에 대한 검증을 다음 코드로 교체하자.
+
+```swift
+let allowedCharacters = CharacterSet(
+  charactersIn: "/%&=?$#+-~@<>|\\*,.()[]{}^!").inverted
+
+guard let expectedUsername = "dasdöm".addingPercentEncoding(
+  withAllowedCharacters: allowedCharacters) else { fatalError() }
+
+guard let expectedPassword = "%&34".addingPercentEncoding(
+  withAllowedCharacters: allowedCharacters) else { fatalError() }
+
+XCTAssertEqual(urlComponents?.percentEncodedQuery,
+              "username=\(expectedUsername)&password=\(expectedPassword)")
+```
+
+이 수정으로 엔코딩된 사용자 이름과 비밀번호가 URL 쿼리에 사용되었는지 검증한다. 테스트를 수행하자. 이 경우 URL이 문자열이 될 수 없어서 에러가 발생하고, 테스트는 멈춘다. `loginUser(withName:password:completion:)`를 변경해서 해결하자.
+
+```swift
+let allowedCharacters = CharacterSet(
+    charactersIn: "/%&=?$#+-~@<>|\\*,.()[]{}^!").inverted
+    
+guard let encodedUsername = username.addingPercentEncoding(withAllowedCharacters: allowedCharacters) else { fatalError() }
+
+guard let encodedPassword = password.addingPercentEncoding(withAllowedCharacters: allowedCharacters) else { fatalError() }
+
+let query = "username=\(encodedUsername)&password=\(encodedPassword)"
+guard let url = URL(string: "https://awesometodos.com/login?\(query)") else {
+  fatalError()
+}
+
+session.dataTask(with: url) { (data, response, error) in
+  
+}
+```
+
+이 코드로 URL을 만들기 전에 사용자 이름과 비밀번호를 엔코딩할 수 있다. 테스트를 돌리면 성공한다.
+
+지금의 테스트는 쿼리 아이템의 순서에 의존적이다. URL에서 순서는 상관없기 때문에 이는 좋은 생각이 아니다. 이는 URL에 정확해도 실패할 수 있다는 것을 의미한다. 그러니 다음 테스트로 가기 전에 리팩토링하자. 힌트: `URLComponents`는 `queryItems`라는 프로퍼티를 가지고 있다. 이걸 써보자.
+
+지금 현재, `MockURLSession`은 요청의 URL을 캐치한다. 로그인 코드를 테스트하려면, 테스트에서 data task의 completion handler를 요청할 수 있어야 한다. 이 방법으로 로그인 코드가 예상한 방식의 반환 데이터로 진행하는지 보장할 수 있다. `dataTask`에 `resume`이 호출될 때 completion handler를 캐치하면서 이 작업을 수행할 수 있다.
+
+먼저 data task에 대한 mock을 만들어야 한다. 다음 모의 클래스를 `APIClientTests`에 추가하자.
+
+```swift
+class MockTask: URLSessionDataTask {
+  private let data: Data?
+  private let urlResponse: URLResponse?
+  private let responseError: Error?
+  
+  typealias CompletionHandler = (Data?, URLResponse?, Error?) -> Void
+  var completionHandler: CompletionHandler?
+  
+  init(data: Data?, urlResponse: URLResponse?, error: Error?) {
+    self.data = data
+    self.urlResponse = urlResponse
+    self.responseError = error
+  }
+  
+  override func resume() {
+    DispatchQueue.main.async {
+      self.completionHandler?(self.data,
+                              self.urlResponse,
+                              self.responseError)
+    }
+  }
+}
+```
+
+이 코드는 네 개의 프로퍼티를 정의한다. 처음 세 개의 프로퍼티는 completion handler에서 사용될 값을 설정한다. 네 번째 프로퍼티는 `resume()`이 호출될 때 실행되는 completion handler이다.
+
+추가로 이 mock은 두 개의 메서드를 갖는다. `init`은 completion handler에 사용되는 값을 받고, `resume`을 재정의한다. `resume` 메서드에서 completion handler는 메인큐로 보내진다. completion handler가 주변 코드에 대해 비동기인 것을 확인하기 위해 수행된다.
+
+`MockURLSession`은 모의 data task를 만들어야 하고, `dataTask(with:completionHandler:)`가 호출될 때 모의 task를 리턴해야 한다. `MockURLSession` 클래스를 다음처럼 수정하자.
+
+```swift
+class MockURLSession: SessionProtocol {
+  var url: URL?
+  private let dataTask: MockTask
+  
+  init(data: Data?, urlResponse: URLResponse?, error: Error?) {
+    dataTask = MockTask(data: data,
+                        urlResponse: urlResponse,
+                        error: error)
+  }
+  
+  func dataTask(
+    with url: URL,
+    completionHandler: @escaping (Data?, URLResponse?, Error?) -> Void)
+    -> URLSessionDataTask {
+      
+      self.url = url
+      dataTask.completionHandler = completionHandler
+      return dataTask
+  }
+}
+```
+
+data task를 만들고 저장하는 `init` 메서드를 추가했다. completion handler가 호출될 때 사용되는 인자들을 받는다. `dataTask(with:completionHandler:)`에서 completion handler를 모의 data task에 저장하고, 이를 반환한다.
+
+이렇게 준비되면, completion handler의 요청은 모의 data task의 resume이 호출될 때 실행된다. completion handler의 인자들은 `MockURLSession`이 인스턴화될 때 할당된다.
+
+`init`메서드를 `MockURLSession`에 추가 했기 때문에, 이전 테스트의 모의 URL Session은 더 이상 컴파일되지 않는다. `let mockURLSession = MockURLSession(data: nil, urlResponse: nil, error: nil)`으로 바꾸자.
+
+이제 테스트할 준비가 됐으니 다음을 추가하자.
+
+```swift
+func test_Login_WhenSuccessful_CreatesToken() {
+  let sut = APIClient()
+  let jsonData = "{\"token\" : \"1234567890\"}".data(using: .utf8)
+  let mockURLSession = MockURLSession(data: jsonData,
+                                      urlResponse: nil,
+                                      error: nil)
+  sut.session = mockURLSession
+  
+  let tokenExpectation = expectation(description: "Token")
+  var catchedToken: Token? = nil
+  sut.loginUser(withName: "Foo", password: "Bar") { (token, error) in
+    catchedToken = token
+    tokenExpectation.fulfill()
+  }
+  
+  waitForExpectations(timeout: 1) { (error) in
+    XCTAssertEqual(catchedToken.id, "1234567890")
+  }
+}
+```
+
+먼저, 모의 URL Session이 있는 `sut`가 간단한 JSON 을 반환하도록 준비하자. 그 다음, expectation을 생성하고, `login` 메서드를 호출하자. 어쨌든 completion handler에서 간단한  JSON을 반환히기 때문에 사용자 이름이나 비밀번호는 상관없다. 테스트 마지막에, expectation이 만족될때까지 기다렸다가 토큰이 예상한 `id`를 가지고 있는지 검증한다.
+
+`Token`이 `id`를 가지고 있지 않기 때문에 컴파일 안 된다. 프로퍼티를 추가하자.
+
+```swift
+let it: String
+```
+
+completion handler가 아무것도 하지 않기 때문에 테스트는 실패한다. `session.dataTask(with:completionHandler:)`를 다음으로 교체하자.
+
+```swift
+session.dataTask(with: url) { (data, response, error) in
+  guard let data = data else { return  }
+  let dict = try! JSONSerialization.jsonObject(
+    with: data,
+  options: []) as? [String: String]
+  
+  let token: Token?
+  if let tokenString = dict?["token"] {
+    token = Token(id: tokenString)
+  } else {
+    token = nil
+  }
+  completion(token, nil)
+}.resume()
+```
+
+이제 생성된 data task에 `resume()` 호출한다. 그렇지 않으면, completion handler는 호출되지 않고, 테스트를 통과할 수 없다.
+
+이 코드는 응답 데이터로부터 dictionary를 얻고 'token' key의 문자열로부터 `Token` 인스턴스를 생성한다. 생성된 토큰은 `login` 메서드의 completion handler로 전달 된다.
+
+모든 테스트를 통과한다. 코드가 나빠보이지만 리팩토링 할 것은 없다. 스위프트 코드에서 느낌표를 볼때마다, 이것이 정말 필요한 것인지 개발자가 개으른 것인지 알아야 한다. 이전 코드에서 우리는 `try!`로 에러 처리를 넘어갔다. 실제 코드를 가이드하는 대신 테스트를 통해 이 코드를 리팩토링하자.
+
+### Handling errors
+
+`jsonObject(with:options:)`를 사용하는 대신 `try!`를 사용하는 것은 컴파일러에게 '이것은 절대 실패하지 않을 거야' 라고 말하는 것이다. 잘못된 데이터를 이용하는 테스트를 작성하고, 에러가 발생하는지 검증해보자.
+
+```swift
+func test_Login_WhenJSONIsInvalid_ReturnsError() {
+  let sut = APIClient()
+  let mockURLSession = MockURLSession(data: Data(), 
+                                      urlResponse: nil,
+                                      error: nil)
+  sut.session = mockURLSession
+  let errorExpectation = expectation(description: "Error")
+  var catchedError: Error? = nil
+  sut.loginUser(withName: "Foo", password: "Bar") { (token, error) in
+    catchedError = error
+    errorExpectation.fulfill()
+  }
+  
+  waitForExpectations(timeout: 1) { (error) in
+    XCTAssertNotNil(catchedError)
+  }
+}
+```
+
+이 테스트에서 빈 데이터 객체를 completion handler에 넘긴다.
+
+deserialization를 실패하기 때문에 에러가 발생하고 코드는 멈춘다. 이 에러를 다룰 수 있도록 코드를 바꿔보자. 
+
+```swift
+guard let data = data else { return }
+do {
+  let dict = try JSONSerialization.jsonObject(
+    with: data,
+    options: []) as? [String:String]
+  
+  let token: Token?
+  if let tokenString = dict?["token"] {
+    token = Token(id: tokenString)
+  } else {
+    token = nil
+  }
+  completion(token, nil)
+} catch {
+  completion(nil, error)
+}
+```
+
+이 코드로 에러를 캐치할 수 있고, 그것을 로그인 메서드의 completion 블럭으로 넘길 수 있다. 테스트는 모두 성공한다.
+
+다음, 실제 코드에서 데이터가 `nil`일 때, completion handler가 에러와 함께 호출되는지를 확인해야 한다.
+
+```swift
+func test_Login_WhenDataIsNil_ReturnsError() {
+  
+  let sut = APIClient()
+  let mockURLSession = MockURLSession(data: nil,
+                                      urlResponse: nil,
+                                      error: nil)
+  sut.session = mockURLSession
+  
+  let errorExpectation = expectation(description: "Error")
+  var catchedError: Error? = nil
+  sut.loginUser(withName: "Foo", password: "Bar") { (token, error) in
+    catchedError = error
+    errorExpectation.fulfill()
+  }
+  
+  waitForExpectations(timeout: 1) { (error) in
+    XCTAssertNotNil(catchedError)
+  }
+}
+```
+
+테스트가 실패하는 것을 확인하자.
+
+테스트를 통과하려면, 던질 에러를 정의해야 한다. 다음 `APIClient.swift` enum을 추가하자.
+
+```swift
+enum WebServiceError: Error {
+  case DataEmpryError
+}
+```
+
+completion handler의 시작도 바꿔보자.
+
+```swift
+guard let data = data else { 
+  completion(nil, WebserviceError.DataEmptyError) 
+  return 
+}
+```
+
+테스트는 성공하고, 리팩토링할 것도 없다.
+
+처리해야 할 한 가지 에러가 있다. data task의 completion handler는 `error` 매개변수로 호출된다. 웹서비스는 이 매개변수로 발생하는 모든 에러를 반환한다. 우리 코드는 이 코드를 처리해야 한다. 다음 테스트를 추가하자.
+
+```swift
+func test_Login_WhenResponseHasError_ReturnsError() {
+  
+  let sut = APIClient()
+  let error = NSError(domain: "SomeError",
+                      code: 1234,
+                      userInfo: nil)
+  let jsonData = "{\"token\": \"1234567890\"}".data(using: .utf8)
+  let mockURLSession = MockURLSession(data: jsonData,
+                                      urlResponse: nil,
+                                      error: error)
+  sut.session = mockURLSession
+  
+  let errorExpectation = expectation(description: "Error")
+  var catchedError: Error? = nil
+  sut.loginUser(withName: "Foo", password: "Bar") { (token, error) in
+    catchedError = error
+    errorExpectation.fulfill()
+  }
+  
+  waitForExpectations(timeout: 1) { (error) in
+    XCTAssertNotNil(catchedError)
+  }
+}
+```
+
+모의 URL session을 유효한 응답으로 초기화했다. 이 테스트에서 data로 nil을 전달하면, 심지어 응답 에러를 처리하는 코드를 적지 않았더라도 이미 통과했을 것이다.
+
+테스트를 통과하기 위해, `ResponseError` case를 `WebserviceError`에 추가하자. 그리고 다음 코드를 data task의 completion handler의 처음에 추가하자.
+
+```swift
+guard error == nil else { completion(nil, error); return }
+```
+
+테스트는 성공하고, 리팩토링할 것은 없다.
+
+`APIClient`에는 몇 가지 남은 테스트와 구현 코드가 있다. 예를 들어, 웹어플리케이션의 투두 아이템에 접근하도록 하려면 아이템을 서버에서 가져오고, 포스트하는 테스트를 추가할 수 있다. 
+
+### Summary
+
+이 장에서 우리는 `XCTest`가 제공하는 expectation을 사용해 테스트를 작성했다. 또한, 서버를 모의하기 위해 stub를 사용했다. 우리는 우리 목표(가능한 적은 버그를 가진 완성된 앱)에 근접하도록하는 두 가지 방법에 대해 살펴봤다. 
+
+우리는 우리의 모의 URL session의 session data task의 completion handler를 캐치하기 위해 의존성 주입을 사용했다. 이 방법으로, 테스트 데이터를 실제 코드에 넣을 수 있었고, 실제 코드가 예상대로 구현되어는지를 검증할 수 있었다. completion handler가 받은 데이터를 제어해서, 모든 종류의 에러를 흉내낼 수 있었고, 실제 구현 코드가 에러를 다룰 수 있게 했다.
+
+다음 장에서는 이전 장의 다른 부분들을 모을 것이고, 마지막엔 앱이 돌아가는지 확인할 것이다.
