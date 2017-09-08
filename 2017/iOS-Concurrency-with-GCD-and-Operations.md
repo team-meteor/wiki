@@ -18,7 +18,7 @@
 - 같은 resource에 접근하는 task라면 thread safe 해야 한다.
 
 ### 4. which to use? GCD(Grand Central Dispatch) or operations?
-- iOS 운영체제에서 멀티태스킹할 때 사용하는 API로서 간접적으로 thread를 통제하는 툴입니다.
+- 운영체제는 thread를 관리한다. GCD, Operation은 복수의 task를 처리할 때 Queue라는 가상의 구조를 사용해서 처리하는 api로서, 개발자가 thread를 직접통제하는 위험을 줄일 수 있다.
 - GCD는 보다 간단한 작업에 적합, operation은 복잡한 작업에 적합
 
 ### 5. where do tasks run?
@@ -32,7 +32,7 @@
 - 개발자가 task 를 dispatch queue 또는 operation queue에 넣으면 시스템이 thread를 몇개 만들지 결정한다
 
 ### 7. async
-- GCD, operation 은 비동기 작업을 다른 thread에서 동작하게 한다
+- 비동기는 task 처리시 현재의 thread를 차단하지 않고 task 실행을 다른 thread에게 넘기고 하던 일을 계속한다.
 
 ```swift
 let queue = DispatchQueue(label: "com.raywenderlich.worker")
@@ -65,18 +65,10 @@ queue.async {
 
 ---
 
-## GCD (업무분담)
-- serial queue(private): 각각의 큐에서는 동시에 하나의 task만 실행. 여러개의 serial queue를 만들면 각 큐에서는 동시에 각각 1개의 task만 실행하지만 전체적으로는 동시에 여러 task를 실행한다.
+## GCD (업무분담) = DispatchQueue를 사용한다
+- serial queue(private): 복수의 task를 처리할 때 task의 완료순서를 보장한다. 각각의 큐에서는 동시에 하나의 task만 실행. 여러개의 serial queue를 만들면 각 큐에서는 동시에 각각 1개의 task만 실행하지만 전체적으로는 동시에 여러 task를 실행한다. 
 - serial queue를 사용하면 thread간 충돌이 없기 때문에 concurrency의 여러 문제점 해결 가능
-
-## queue에 task를 추가하는 방식 2가지
-- 동기 = 큐에 task를 추가하기 위해 기다린다
-- 비동기 = 큐에 task를 추가하기 위해 예약해놓고 다른 일하러 간다
-
-## concurrent queue와 async 는 같은 것이 아니다
-- serial queue or concurrent queue 에서 모두 비동기 업무 처리가 가능하다
-- 동기와 비동기의 차이는 queue 상에서 task가 완료될 때 까지 기다리느냐의 차이이다
-- serial 과 concurrent의 차이는 thread 갯수 차이이다 (동시에 몇개의 업무가 처리 가능한지의 차이)
+- concurrent queue: 복수의 task 처리시 task 완료 순서를 보장하지 않는다.
 
 ## GCD의 queue 종류 (First In First Out, task가 도착하는 순서로 시작한다)
 
@@ -117,7 +109,7 @@ DispatchQueue.global().async {
 ```
 
 ## sync
-- 주로 getter, setter 에 사용 (잠시 current queue 를 block 하므로 주의해야 한다)
+- 주로 getter, setter 에 사용 (잠시 current thread 를 block 하므로 주의해야 한다)
 - task가 끝날때까지 current thread를 block 한다. 끝날때 까지 current thread에 다른 업무를 분배할 수 없다
 - current queue에서 sync 업무를 분배하면 deadlock에 걸릴 수 있다
 - main queue에서 절대 sync 업무 분배하지 않는다 (main thread를 block하기 때문)
@@ -368,4 +360,96 @@ filterImageOperation.start()
 - filter작업이 느리기 때문에 수정이 필요하다
 
 ### OperationQueue
-- 
+```swift
+open class OperationQueue: NSObject {
+    open class var current: OperationQueue? { get }
+    open class var main: OperationQueue { get }
+    public class let defaultMaxConcurrentOperatinoCount: Int
+    open var maxConcurrentOperationCount: Int
+
+    open func addOperation(_ op: Operation)
+    open func addOperation(_ block: @escaping () -> Swift.Void)
+    open func addOperations(_ ops: [Operation], waitUntilFinished wait: Bool)
+
+    open var operations: [Operation] { get }
+    open var operationCount: Int { get }
+
+    //management
+    open func cancelAllOperations()
+    open func waitUntilAllOperationsAreFinished()
+
+    open var qualityOfServce: QualityOfServic
+    open var isSuspended: Bool
+    unowned (unsafe) open var underlyingQueue: DispatchQueue?
+    open var name: String?
+}
+```
+- main operation queue: UI 관련 operation 실행
+- defaultMaxConcurrentOperationCount를 제한할 수 있으며 만약 -1 이면 시스템에게 알아서 하라는 뜻이다. 1이면 serial operation queue가 된다
+- qos, dependency 등이 설정된 것에 따라 순서에 맞게 Operation Queue에서 operations이 실행된다. 우선순위가 모두 같다면 넣어진 순서대로 실행된다
+- operation은 완료되거나 취소되면 queue를 떠난다
+- operation이 큐에 넣어지면 같은 operation을 다른 어떤 큐에도 넣을 수 없다. operation은 1회용이라서 한번 실행되면 재실행할 수 없다.
+- 모든 operations가 끝나는 시점을 알고 싶다면 private serial dispatch queue를 사용하거나, wailIntilFinished를 true로 설정하고 completion closure 넣기
+- 각 operation마다 다른 qos 설정이 가능하다. default qos 값은 background 이다
+- isSuspended 프로퍼티를 사용해 operation queue을 중지할 수 있다. 현재 실행중인 operation은 계속 진행하되 나머지는 실행되지 않는다. 중지된 큐에 새로운 operation을 넣을 수 있지만 isSuspended가 false가 되기 전에는 실행되어지지는 않는다
+- KVO 의 디폴트값은 false이다
+- 아직 operation queue이 비어있는 상태라면 main queue를 제외한 기존의 dispatch queue는 Operation queue의 underlying queue로서 동작할 수 있다. underlying queue의 qos는 operation queue의 qos를 따른다
+- 앞서 보았듯이 개별적인 Operation은 동기적으로 동작하며 main thread를 차단하는 것을 방지하기 위해 Dispatch queue에 넣어서 비동기적으로 동작시킬 수 있었다. 그러나 완전히 concurrent 하게 동작하는 것처럼 하기 위해서는 Operation queue를 활용하는 것이 장점이 많다.
+```swift
+//빈 operation queue 만들기
+let printerQueue = OperationQueue
+printerQueue.maxConcurrentOperationCount = 2
+
+printerQueue.addOperation {
+    print("hello")
+    sleep(3)
+}
+printerQueue.addOperation {
+    print("my")
+    sleep(3)
+}
+printerQueue.addOperation {
+    print("name")
+    sleep(3)
+}
+printerQueue.addOperation {
+    print("is")
+    sleep(3)
+}
+printerQueue.addOperation {
+    print("samchon")
+    sleep(3)
+}
+
+printerQueue.waitUntilAllOperationsAreFinished()
+```
+- operation queue에 넣으면 operation.start() 하지 않아도 opearation queue가 준비되면 시작한다
+- 앞서 operation을 Dispatch queue에 넣은것처럼 Operation queue에 넣으면 background thread에서 concurret하게 동작한다
+- Dispatch group과 같이, operationqueue의  waitUntilAllOperationsAreFinished() 메소드를 사용하면 current queue를 차단하고 모든 업무가 완료될때까지 기다린다
+- maxConcurrentCount 프로퍼티를 통해 최대 몇개의 operation을 동시체 처리할 것인지 제한 가능
+
+```swift
+let images = ["city", "dark road", "train day", "train dusk", "train night"].map { UIImage(named: "\($0).jpg")}
+var filterdImages = [UIImage]
+
+let filterQueue = OperationQueue()
+
+let serialQueue = OperationQueue()
+serialQueue.maxConcurrentOperationCount = 1
+
+for image in images {
+    let filterOperation = Operation()
+    filterOperation.inputImage = image
+
+    filterOperation.completionBlock {
+        guard let ouput = filterOperation.outputImage else { return }
+        serialQueue.addOperation {
+            filteredImages.append(output)
+        }
+    }
+
+    filterQueue.addOperation(filterOperation)
+}
+
+filterQueue.waitUntilAllOperationsAreFinished()
+```
