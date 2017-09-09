@@ -141,4 +141,157 @@ extension SearchViewController: URLSessionDownloadDelegate {
 - urlSession(_:downloadTask:didFinishDownloadingTo:) 은 URLSessionDownloadDelegate 메소드 중 유일하게 옵셔널이 아니다. 다운로드가 끝날 때 호출된다. 이제 다운로드가끝나면 메시지를 프린트할 것이다.
 
 ### Creating a Download Task
-- 
+- 이제 파일 다운로드할 준비가 되었다. download task를 처리할 session 먼저 만들어보자. Controller/SearchViewController.swift 파일에서 viewDidLoad() 앞에 아래의 코드를 추가하자
+
+```swift
+lazy var downloadsSession: URLSession = {
+  let configuration = URLSessionConfiguration.default
+  return URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
+}()
+```
+- default configuration을 사용해서 세션을 생성하였다. 그리고 이벤트를 처리할 viewcontroller에 대해서 delegate를 지정하였다. 이는 task의 진행상황을 모니터링하는 데에 유용하다.
+- delegate queue를 nil로 지정한 것은 세션이 serial operation queue를 사용하도록 한다.
+- lazy를 사용한 것은 view controller가 초기화된 이후에 세션이 생성되도록 하여 delegate를 지정한 self 즉 viewController를 인식할 수 있게 해준다
+- 이제 viewDidLoad()의 끝에 다음을 추가하자
+```swift
+downloadService.downloadsSession = downloadsSession
+```
+- DownloadService의 downloadsSession 프로퍼티를 설정하였다
+- 위에서 구성한 세션과 delegate를 통해 마침내 유저가 트랙 다운로드 요청시 download task를 생성할 준비를 마쳤다
+- Networking/DownloadService.swift 파일에서 tartDownload(_:) 를 다음과 같이 수정하자
+```swift
+func startDownload(_ track: Track) {
+  // 1
+  let download = Download(track: track)
+  // 2
+  download.task = downloadsSession.downloadTask(with: track.previewURL)
+  // 3
+  download.task!.resume()
+  // 4
+  download.isDownloading = true
+  // 5
+  activeDownloads[download.track.previewURL] = download
+}
+```
+- 유저가 테이블뷰 셀의 다운로드 버튼을 누르면 TrackCellDelage를 적용받는 SearchViewController는 그 셀에 대한 특정 트랙을 인식하고 startDownload(_:) 를 호출한다. 
+- 1. 특정 트랙에 대한 Download를 생성
+- 2. 새로운 session을 이용해 트랙의 preview url를 포함하는 download task를 생성한다. 그리고 이 task를 Download의 task 프로퍼티에 넣는다
+- 3. resume() 호출하여 task 시작한다
+- 4. 다운로드가 진행중이라고 설정
+- 5. url 과 Donwload를 activeDownloads 딕셔너리에 맵핑한다
+
+- 앱을 실행해서 다운로드 버튼을 눌러보자. 잠시 후 디버그 콘솔에 다운로드 완료 메시지를 볼 수 있을 것이다. 다운로드 버튼은 남아있으나 곧 고칠것이다. 이제 노래를 재생해보자
+
+## Saving and playing the track
+- download 완료시 delagate 메소드인 urlSession(_:downloadTask:didFinishDownloadingTo:) 메소드는 임시파일 위치 url을 전달된다. 출력메시지에서 이를 확인할 수 있다. 이제 이를 반환하기 전에 샌드박스 폴더의 영구적 위치에 옮겨야 한다. SearchVC+URLSessionDelegates 에서 urlSession(_:downloadTask:didFinishDownloadingTo:) 내의 프린트를 다음으로 수정하자
+```swift
+// 1
+guard let sourceURL = downloadTask.originalRequest?.url else { return }
+let download = downloadService.activeDownloads[sourceURL]
+downloadService.activeDownloads[sourceURL] = nil
+// 2
+let destinationURL = localFilePath(for: sourceURL)
+print(destinationURL)
+// 3
+let fileManager = FileManager.default
+try? fileManager.removeItem(at: destinationURL)
+do {
+  try fileManager.copyItem(at: location, to: destinationURL)
+  download?.track.downloaded = true
+} catch let error {
+  print("Could not copy file to disk: \(error.localizedDescription)")
+}
+// 4
+if let index = download?.track.index {
+  DispatchQueue.main.async {
+    self.tableView.reloadRows(at: [IndexPath(row: index, section: 0)], with: .none)
+  }
+}
+```
+- 1. 다운로드가 완료된 task로부터 요청 url을 추출하고 그에 상응하는 Download를 찾아서 딕셔너리에서 제거한다.
+- 2. SearchViewController.swift 에 있는 헬퍼 메소드인 localFilePath(for:) 를 사용하여 영구 로컬 파일 url을 생성한다. 
+- 3. FileManager를 사용해서 다운로드한 파일을 임시폴더에서 destinationURL로 이동시켜야한다. 우선 복사하기 전에 destinationURL에 혹시라도 있을 item을 지우고, 복사해서 이동시킨 후 다운로드 트랙의 downloaded 프로퍼티를 true로 변경한다
+- 4. 마지막으로 다운로드 트랙의 index를 사용하여 테이블뷰의 해당 셀을 reload 한다.
+- 앱을 실행하고 트랙을 다운로드해서 다운로드가 완료되었을 때 콘솔에 로컬파일 저장위치가 프린트되는 것을 확인할 수 있다. 다운로드 버튼은 사라진다. 왜냐하면 delegate 메소드에서 트랙의 downloaded 프로퍼티를 true로 했기 때문이다. 트랙을 클릭하면 AVPlayerViewController를 통해 재생되는 노래를 들을 수 있다.
+
+## Pausing, Resuming, and Cancelling Downloads
+- 만약 다운로드 하던것을 중지하고 싶다면 또는 취소하고 싶다면? 이번 섹션에서는 중지, 재시작, 취소 기능을 적용해서 유저에게 다운로드에 대한 완벽한 통제권을 제공할 것이다. 먼저 취소기능부터 시작하자. DownloadService.swift 에서 cancelDownload(_:) 메소드를 다음과 같이 수정하자
+```swift
+func cancelDownload(_ track: Track) {
+  if let download = activeDownloads[track.previewURL] {
+    download.task?.cancel()
+    activeDownloads[track.previewURL] = nil
+  }
+}
+
+```
+- 다운로드를 취소하기 위해서 진행중인 다운도르가 담긴 딕셔너리에서 상응하는 Download를 찾아서 cancel() 호출한다. 그리고나서 딕셔너리에서 그 downlaod object를 제거한다
+- 다운로드 중지는 취소 개념과 유사하다. 중지기능은 download task를 취소하는 것은 같지만, 호스트 서버가 지원한다면 이후에 재시작하기 위한 정보를 담는 resume data를 생성해야한다.
+- Note : 특정 조건에서만 다운로드를 재시작할 수 있다. 예를 들어 처음에 요청한 이후로 정보가 변하면 안된다.
+- 이제 pauseDownload(_:)를 다음과 같이 채워보자
+```swift
+func pauseDownload(_ track: Track) {
+  guard let download = activeDownloads[track.previewURL] else { return }
+  if download.isDownloading {
+    download.task?.cancel(byProducingResumeData: { data in
+      download.resumeData = data
+    })
+    download.isDownloading = false
+  }
+}
+```
+- 취소기능과의 가장 큰 차이점은 cancel() 호출 대신에 cancel(byProducingResumeData:) 를 호출한다는 점이다. 나중에 재시작하는데 필요한 resume data를 생성하기 위해 클로저를 포함한다. 또한 isDownloading 프로퍼티를 false 로 설정한다. 중지 기능이 완성되었으니 재시작 기능을 추가해보자
+- resumeDownload(_:) 메소드를 다음과 같이 채우자
+```swift
+func resumeDownload(_ track: Track) {
+  guard let download = activeDownloads[track.previewURL] else { return }
+  if let resumeData = download.resumeData {
+    download.task = downloadsSession.downloadTask(withResumeData: resumeData)
+  } else {
+    download.task = downloadsSession.downloadTask(with: download.track.previewURL)
+  }
+  download.task!.resume()
+  download.isDownloading = true
+}
+```
+- 유저가 다운로드를 재시작할 때, resume data를 체크해야한다. resume data가 발견되면 이를 가지고 downloadTask(withResumeData:) 메소드를 이용해 새로운 download task를 생성한다. 만약 resume data가 없으면, download URL를 이용해서 새로운 download task를 만든다.
+- resume data를 이용하는 것과 donwload URL를 이용하는 두 경우 모두 resume() 호출을 통해 task 를 시작하고 isDownloading 을 true로 설정한다.
+- 이제 한가지 할 일만 남았다. 중지버튼, 재시작버튼, 취소버튼을 적절하게 숨기거나 보여주어야 한다. 그러기 위해서 TrackCell의 configure(track:downloaded:) 메소드는 해당 트랙이 다운로드 진행중인지 알아야 한다.
+- TrackCell.swift 에서 configure(track:downloaded:) 를 다음과 같이 수정하자
+```swift
+func configure(track: Track, downloaded: Bool, download: Download?) {
+```
+-  SearchViewController.swift 에서 tableView(_:cellForRowAt:) 안의 cell을 다음과 같이 수정하자
+```swift
+cell.configure(track: track, downloaded: track.downloaded, 
+  download: downloadService.activeDownloads[track.previewURL])
+```
+- activeDownloads 딕셔너리에서 해당 track의 download object를 추출한다.
+- TrackCell.swift 에서 configure(track:downloaded:download:) 메소드에 있는 TODO 두가지 중에 첫번째를 다음과 같이 추가하자
+```swift
+var showDownloadControls = false
+```
+- 두번째에는 다음과 같이 추가하자
+``` swift
+if let download = download {
+  showDownloadControls = true
+  let title = download.isDownloading ? "Pause" : "Resume"
+  pauseButton.setTitle(title, for: .normal)
+}
+```
+- download object가 nil 이 아니면 현재 다운로드 진행중이라는 의미이다. 따라서 cell은 중지/재시작, 취소 버튼을 보여주어야 한다. 중지와 재시작은 같은 버튼을 공유하기 때문에 토글로 구현하면 된다. if 구문 아래에 다음을 추가하자
+```swift
+pauseButton.isHidden = !showDownloadControls
+cancelButton.isHidden = !showDownloadControls
+```
+- 다운로드가 진행중일 때에만 버튼을 보이게 만들었다 아래의 메소드를 그 다음과 같이 수정하자
+```swift
+downloadButton.isHidden = downloaded
+```
+```swift
+downloadButton.isHidden = downloaded || showDownloadControls
+```
+- 만약 트랙이 다운로드 중이라면 다운로드 버튼을 숨기도록 하였다. 앱을 실행하고 다운로드를 해보면 중지, 재시작, 취소가 가능해졌다
+- Note : 만약 다운로드를 재시작하고 중지하고 다시 재시작한 후에 멈춘다면 이상한 버그이다. 이는 download session configuration 을 URLSessionConfiguration.background(withIdentifier: "bgSessionConfiguration")으로 변경하면 버그가 사라질 것이다.
+
+## Showing Download Progress
