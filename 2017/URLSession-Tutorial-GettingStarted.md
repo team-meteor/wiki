@@ -295,3 +295,103 @@ downloadButton.isHidden = downloaded || showDownloadControls
 - Note : 만약 다운로드를 재시작하고 중지하고 다시 재시작한 후에 멈춘다면 이상한 버그이다. 이는 download session configuration 을 URLSessionConfiguration.background(withIdentifier: "bgSessionConfiguration")으로 변경하면 버그가 사라질 것이다.
 
 ## Showing Download Progress
+- 현재 앱 상태에서는 다운로드 진행상황을 볼 수없다. user experience를 개선하기 위해 다운로드 진행상황을 셀에 표시할 수 있게 개선해보자. 이를 위해서 session delegate를 사용할 것이다. 먼저 TrackCell.swift 에서 다음을 추가하자
+```swift
+func updateDisplay(progress: Float, totalSize : String) {
+  progressView.progress = progress
+  progressLabel.text = String(format: "%.1f%% of %@", progress * 100, totalSize)
+}
+```
+- track cell은 progressView 와 progressLabel을 갖는다. delegate 메소드는 값을 설정하기 위해 위 헬퍼메소드를 호출한다.
+- SearchVC+URLSessionDelegates.swift 에서 URLSessionDownloadDelegate extension 에 다음 delegate 메소드를 추가하자
+```swift
+func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, 
+  didWriteData bytesWritten: Int64, totalBytesWritten: Int64, 
+  totalBytesExpectedToWrite: Int64) {
+  // 1
+  guard let url = downloadTask.originalRequest?.url,
+    let download = downloadService.activeDownloads[url]  else { return }
+  // 2
+  download.progress = Float(totalBytesWritten) / Float(totalBytesExpectedToWrite)
+  // 3
+  let totalSize = ByteCountFormatter.string(fromByteCount: totalBytesExpectedToWrite, countStyle: .file)
+  // 4
+    DispatchQueue.main.async {
+    if let trackCell = self.tableView.cellForRow(at: IndexPath(row: download.track.index,
+      section: 0)) as? TrackCell {
+      trackCell.updateDisplay(progress: download.progress, totalSize: totalSize)
+    }
+  }
+}
+```
+- 1. downloadTask로부터 url을 추출하고 이를 통해 active downloads 딕셔너리에서 해당 download를 찾는다
+- 2. 위 메소드는 다운로드된 바이트와 남은 다운로드 바이트를 제공한다. 이 비율을 통해서 다운로드 진행률을 계산하여 그 값을 Donwload에 저장한다. track cell은 이 값을 이용해 progressView를 업데이트한다
+- 3. ByteCountFormatter 는 인간이 읽을 수 있는 형태로 다운로드파일 사이즈를 제공한다. 퍼센트 진행률의 크기를 알려줄 String 타입을 사용할 것이다.
+- 4. 마지막으로 해당 셀을 찾아서 progressView 와 progressLabel을 업데이트한다. 이 작업은 UI 관련이므로 메인큐에서 수행한다.
+- TrackCell.swift 를 열고 configure(track:downloaded:download:) 안의 if 구문에 중지버튼 타이틀 설정부분 밑에 다음을 추가하자
+```swift
+progressLabel.text = download.isDownloading ? "Downloading..." : "Paused"
+```
+- 위에서는 다운로드 완료되어 delegate 메소드로부터 업데이트 되거나 다운로드가 중지되기 이전에 셀에서 보여줄 정보를 준다.
+- if 구문 아래에 다음을 추가하자
+```swift
+progressView.isHidden = !showDownloadControls
+progressLabel.isHidden = !showDownloadControls
+```
+- 다운로드 진행상황에서만 progressView 와 label 을 보여준다
+- 앱을 실행해서 해보면 다운로드 상황에서 프로그레스 바가 업데이트 되고 라벨에 진행률이 뜨는 것을 볼 수 있다
+
+## Enabling Background Transfers
+- 이제 앱에 많은 기능이 추가되었다. 그러나 한가지 더 남았다. 앱이 background에 있거나 어떤 이유로 충돌이 난 상태에서도 다운로드를 유지하게 하는 기능이 필요하다. 짧은 30초 노래 프리뷰 앱에서는 그다지 필요하지 않으나 대용량 파일을 전송할 때에는 필요한 기능이다.
+- 만약 앱이 동작하지 않는다면 이것이 어떻게 가능할까? 운영체제는 background 전송을 수행하기 위해 앱 밖에서 분리된 데몬을 돌린다. 그리고 background download task를 수행할 때 앱에게 delegate 메시지를 보낸다. 앱이 종료되더라도 진행중이던 background 전송에게는 영향을 미치지 않는다.
+- 전송이 완료되면 데몬은 background에서 앱을 재실행시킨다. 재실행된 앱은 background session을 다시 만들고 관련 완료 메시지를 받아서 다운받은 파일을 disk로 옮기는 등의 작업을 수행한다.
+- Note : 만약 유저가 강제로 앱을 종료시킨다면 운영체제는 모든 background 전송을 취소할 것이고 앱을 재실행하려 하지 않을 것이다.
+- background session configuration을 사용하여 session을 생성하면 위의 마법같은 기능 구현이 가능하다.
+- SearchViewController.swift 에서 downloadsSession 초기화 부분에서 다음 코드를 아래와 같이 수정해보자
+```swift
+let configuration = URLSessionConfiguration.default
+```
+```swift
+let configuration = URLSessionConfiguration.background(withIdentifier: 
+  "bgSessionConfiguration")
+```
+- default configuraion 대신에 background configuration을 사용했다. 또한 identifier를 설정해서 앱이 필요할 때 새로운 background session을 만들 수 있도록 했다.
+- Note : 1개 이상의 background configuration을 생성하면 안된다. 왜냐하면 운영체제는 세션과 task를 관련시키는 identifier를 사용하기 때문이다.
+- 만약 앱이 실행중이 아닌데 background task가 완료되었다면 앱은 background에서 재실행될 것이다. app delegate에서 이 이벤트를 처리할 수 있다. AppDelegate.swift 에서 클래스 윗부분에 다음을 추가하자
+```swift
+var backgroundSessionCompletionHandler: (() -> Void)?
+```
+- 그리고나서 다음 메소드를 추가하자
+```swift
+func application(_ application: UIApplication, handleEventsForBackgroundURLSession 
+  identifier: String, completionHandler: @escaping () -> Void) {
+  backgroundSessionCompletionHandler = completionHandler
+}
+```
+- 위에서 completionHandler 변수를 생성했다. application(_:handleEventsForBackgroundURLSession:)  메소드는 자고 있는 앱을 깨워서 완료된 background task를 처리하도록 한다. 이 메소드에서 다음 두가지를 처리할 필요가 있다
+- 1. background configuration과 session을 재생성할 필요가 있다. 이를 위해 delegate method에서 제공하는 identifier를 사용한다. 그러나 이 앱에서 SearchViewController 인스턴스 생성시에 background session을 생성하므로 이미 이 부분은 했다
+- 2. delegate 메소드에서 제공하는 completion handler를 캡쳐해야한다. completion handler는 앱이 background 업무를 모두 완료하여다고 운영체제에게 알려준다. 또한 운영체제가 업데이트된 상황의 UI를 캡쳐할 수 있게 한다.
+- completion handler를 호출하는 지점은 urlSessionDidFinishEvents(forBackgroundURLSession:) 이다. 이 메소드는 background 업무가 모두 완료되는 시점에 열일하는 URLSessionDelegate 메소드이다.
+- SearchVC+URLSessionDelegates.swift 에서 다음을 추가하자
+```swift
+import UIKit
+```
+- 마지막으로 다음 extension을 추가하자
+```swift
+extension SearchViewController: URLSessionDelegate {
+
+  // Standard background session handler
+  func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
+    if let appDelegate = UIApplication.shared.delegate as? AppDelegate,
+      let completionHandler = appDelegate.backgroundSessionCompletionHandler {
+      appDelegate.backgroundSessionCompletionHandler = nil
+      DispatchQueue.main.async {
+        completionHandler()
+      }
+    }
+  }
+
+}
+```
+- 위에서는 app delegate로부터 전달된 completion handler 를 메인 스레드에서 호출한다. UIKit 덕분에 app delegate 접근이 가능해진다.
+- 앱을 실행하고 다운로드를 시작하고 홈버튼을 눌러 앱을 background 환경으로 만들자. 다운로드가 완료되었을 것이라 추측될때까지 기다린 후에 홈버튼을 두번 누르자. 다운로드가 완료되었을 것이다. 앱의 스냅샷에 다운로드가 완료되었다는 상태가 반영되었을 것이다. 앱을 다시 열어 확인해보자
