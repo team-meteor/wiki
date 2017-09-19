@@ -1,10 +1,14 @@
-## 문서 저장소
+## 한글 문서(번역 또는 재가공) 저장소
 
-> 주제 : swift, iOS에 관한 '타인'이 생산한 문서를 재가공하여 저장한다.
-> 참여 방법 : 문서 생산 후 목록 업데이트  
-> 규칙 : 파일명은 `file-name` 이런 형태로 작성.
+```markdown
+읽을 가치가 있는 문서를 생산하는 것은 많은 노력과 시간이 필요하다.
+굳이 그럴 에너지는 없지만, 정독하고 싶으면 번역하거나 재가공하자.
 
-### 문서 목록
+- 참여 방법 : 문서 생산 후 목록 업데이트  
+- 규칙 : 파일명은 `file-name` 이런 형태로 작성.
+```
+
+### 목록
 
 - iOS 체크리스트 by JK [read](2017/ios-checklist.md)
   - 스위프트 기본 문법을 이해하고 struct나 class, enum 타입을 만들 수 있다.[read](2017/struct-class-enum.md)
@@ -22,6 +26,7 @@
   - Testing Network Code [read](2017/Testing-Network-Code.md)
 
 - Understand the View Controller Lifecycle 일부 번역 [read](2017/understand-the-view-controller-lifecycle.md)
+  - The common lifecycle of a view controller 일부 재가공 [read](The-common-lifecycle-of-a-view-controller.md)
 
 - Auto Layout Guide [link](https://developer.apple.com/library/content/documentation/UserExperience/Conceptual/AutolayoutPG/index.html)
   - Understanding Auto Layout [read](2017/Understanding-Auto-Layout.md)
@@ -34,3 +39,5 @@
 - raywenderlich.com 튜토리얼 번역
   - iOS Unit Testing and UI Testing Tutorial [read](2017/iOS-Unit-Testing-and-UI-Testing-Tutorial.md)
   - GrandCentralDispatch tutorial for swift3 [1](2017/GrandCentralDispatch-tutorial-for-swift3-part1.md), [2](2017/GrandCentralDispatch-tutorial-for-swift3-part2.md)
+  - Getting Started With RxSwift and RxCocoa [ing](2017/Getting-Started-With-RxSwift-and-RxCocoa.md)
+  - URLSession Tutorial:Getting Started [read](2017/URLSession-Tutorial-GettingStarted.md)
