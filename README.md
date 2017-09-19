@@ -26,6 +26,7 @@
   - Testing Network Code [read](2017/Testing-Network-Code.md)
 
 - Understand the View Controller Lifecycle 일부 번역 [read](2017/understand-the-view-controller-lifecycle.md)
+  - The common lifecycle of a view controller 일부 재가공 [read](The-common-lifecycle-of-a-view-controller.md)
 
 - Auto Layout Guide [link](https://developer.apple.com/library/content/documentation/UserExperience/Conceptual/AutolayoutPG/index.html)
   - Understanding Auto Layout [read](2017/Understanding-Auto-Layout.md)
