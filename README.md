@@ -31,6 +31,7 @@
 - Auto Layout Guide [link](https://developer.apple.com/library/content/documentation/UserExperience/Conceptual/AutolayoutPG/index.html)
   - Understanding Auto Layout [read](2017/Understanding-Auto-Layout.md)
   - Auto Layout Without Constraints [read](2017/Auto-Layout-Without-Constraints.md)
+  - Anatomy of a Constraint [ing](2017/Anatomy-of-a-Constraint.md)
 
 - raywenderlich.com 동영상 강의 정리
   - Networking with URLSession [read](2017/networking-with-URLSession.md)
