@@ -18,13 +18,15 @@ do {
     .filter { $0.count > 0 }
   
   lines.forEach {
-    let words = $0.components(separatedBy: " ")
-    if words.count == 2 {
+    let words = $0.components(separatedBy: ",").map {
+      $0.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    if words.count == 2 && !words[0].contains("\"") {
       dict[words[0]] = words[1] // title, url
     }
   }
   
-  outputString += "\n"
+  outputString += "\n### 2018\n"
   dict.sorted { first, second in
     return first.key < second.key
     }.forEach {
