@@ -1,4 +1,4 @@
-### 2017
+~~2017~~
 
 - iOS 체크리스트 by JK [read](2017/ios-checklist.md)
   - 스위프트 기본 문법을 이해하고 struct나 class, enum 타입을 만들 수 있다.[read](2017/struct-class-enum.md)
