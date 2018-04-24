@@ -8,7 +8,11 @@
 
 ### 2018
 - ProcessManagement
+<<<<<<< HEAD
   - Process [read](https://gist.github.com/3608d469f0707647651f317e51357e0f)
+=======
+  - Process [read](https://gist.github.com/torpedo87/3608d469f0707647651f317e51357e0f)
+>>>>>>> d462dc210caab497b13810b9869736b9ecf9ba6a
 
 ~~2017~~
 
