@@ -7,18 +7,10 @@
 ```
 
 ### 2018
-- AAA
-  - 박준우는 짱일까? [read](https://gist.github.com/hoemoon/12345)
-- BBB
-  - 박준우는 짱일까? [read](https://gist.github.com/hoemoon/12334)
-- RRR
-  - 박준우는 짱일까? [read](https://gist.github.com/hoemoon/12344)
-- TTT
-  - 박준우는 짱일까? [read](https://gist.github.com/hoemoon/11234)
-- 박준우는 짱일까? [read](https://gist.github.com/hoemoon/12346)
-- 박준우는 짱일까? [read](https://gist.github.com/hoemoon/12347)
+- ProcessManagement
+  - Process [read](https://gist.github.com/https://gist.github.com/torpedo87/3608d469f0707647651f317e51357e0f)
 
-### 2017
+~~2017~~
 
 - iOS 체크리스트 by JK [read](2017/ios-checklist.md)
   - 스위프트 기본 문법을 이해하고 struct나 class, enum 타입을 만들 수 있다.[read](2017/struct-class-enum.md)
