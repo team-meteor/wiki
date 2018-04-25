@@ -9,7 +9,7 @@
 ### 2018
 - ProcessManagement
   - Process [read](https://gist.github.com/3608d469f0707647651f317e51357e0f)
-- Thread [read](https://gist.github.com/e91115f58b6169d7fbe1cee3269140e7)
+  - Thread [read](https://gist.github.com/e91115f58b6169d7fbe1cee3269140e7)
 
 ~~2017~~
 
